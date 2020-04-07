@@ -17,22 +17,21 @@ namespace fs = std::experimental::filesystem;
 namespace sa = SawAnalyzeFuncs;
 
 std::mutex m_ostream;
-const bool err_only = true;
+std::mutex m_config;
 
-std::ostream& operator<<(std::ostream& out, const sa::SawAnalyzingFunc::AMPLITUDE_ERRORS value)
+bool err_only = true;
+const int DEFAULT_AMPL_MIN = 0;
+const int DEFAULT_AMPL_MAX = 480;
+const int DEFAULT_AMPL_ERR = 20;
+const int DEFAULT_PULSE_WIDTH = 50;
+
+struct sa::SawAnalyzingFunc::TEST_PARAM tp =
 {
-	static std::map<sa::SawAnalyzingFunc::AMPLITUDE_ERRORS, std::string> strings;
-	if (strings.size() == 0)
-	{
-#define INSERT_ELEMENT(p) strings[p] = #p
-		INSERT_ELEMENT(sa::SawAnalyzingFunc::AMPL_NORM);
-		INSERT_ELEMENT(sa::SawAnalyzingFunc::AMPL_TOO_LOW);
-		INSERT_ELEMENT(sa::SawAnalyzingFunc::AMPL_TOO_HIGHT);
-		INSERT_ELEMENT(sa::SawAnalyzingFunc::AMPL_OUT_BORDER);
-#undef INSERT_ELEMENT
-	}
-	return out << strings[value];
-}
+	DEFAULT_AMPL_MIN,
+	DEFAULT_AMPL_MAX,
+	DEFAULT_AMPL_ERR,
+	DEFAULT_PULSE_WIDTH
+};
 
 void prepare(const string& tested, const string& result)
 {
@@ -48,6 +47,7 @@ void check_data(const fs::path &file_path, const string &outdir)
 {
 	string val;
 	fstream f;
+	bool out = false;
 
 	std::vector<int> v;
 
@@ -61,8 +61,7 @@ void check_data(const fs::path &file_path, const string &outdir)
 			if (!val.empty())
 			{
 				v.push_back(std::stoi(val, nullptr));
-			}
-				
+			}				
 		}
 		f.close();
 	}
@@ -70,28 +69,100 @@ void check_data(const fs::path &file_path, const string &outdir)
 
 	fs::path fname = fs::path(file_path).filename();
 
-	struct sa::SawAnalyzingFunc::TEST_PARAM tp =
-	{
-		0,  //.aml_min 
-		480, //.aml_max
-		20,  //.err
-		50, // .widtр
-	};
-
 	struct sa::SawAnalyzingFunc::RESULT res = { 0 };
 
-	sa::SawAnalyzingFunc::form_checking(res, v) << '\n';
-	sa::SawAnalyzingFunc::amplitude_checking(tp, res, v) << '\n';
-	sa::SawAnalyzingFunc::pulse_width_checking(tp, res, v) << '\n';
+	sa::SawAnalyzingFunc::check_all_tests(tp, res, v);
 
 	std::lock_guard<std::mutex> guard(m_ostream);
 	if (err_only)
 	{
-		if (!check_data(res))
-			sa::SawAnalyzingFunc::result_out(res);
+		if (!sa::SawAnalyzingFunc::result_check(res))
+			out = true;
 	}
-	else sa::SawAnalyzingFunc::result_out(res);
+	else out = true;
 
+	if (out)
+	{
+		std:cout << "TestFile," << fname << '\n';
+		sa::SawAnalyzingFunc::result_out(res);
+	}
+
+}
+
+void clean_cin(void)
+{
+	std::cin.clear();
+	std::cin.ignore(INT_MAX, '\n');
+}
+
+void param_parcer(void)
+{
+	string cmd = "";
+
+	while (1)
+	{
+		std::cin >> cmd;
+		if (cmd == "config")
+		{
+			m_config.lock();
+			std::cout << "----Enter config param---\n";
+			try
+			{
+				std::cout << "err_only:";
+				std::cin >> err_only;
+				if (!cin.good())
+				{
+					clean_cin();
+					std::cout << "Uncorrect value, set default: TRUE\n";
+					err_only = true;
+				}
+						
+
+				std::cout << "amplitude_min:";
+				std::cin >> tp.aml_min;
+				if (!cin.good())
+				{
+					clean_cin();
+					std::cout << "Uncorrect value, set default: " << DEFAULT_AMPL_MIN << '\n';
+					tp.aml_min = DEFAULT_AMPL_MIN;
+				}
+
+				std::cout << "amplitude_max:";
+				std::cin >> tp.aml_max;
+				if (!cin.good())
+				{
+					clean_cin();
+					std::cout << "Uncorrect value, set default: " << DEFAULT_AMPL_MAX << '\n';
+					tp.aml_max = DEFAULT_AMPL_MAX;
+				}
+
+				std::cout << "amplitude error:";
+				std::cin >> tp.err;
+				if (!cin.good())
+				{
+					clean_cin();
+					std::cout << "Uncorrect value, set default: " << DEFAULT_AMPL_ERR << '\n';
+					tp.err = DEFAULT_AMPL_ERR;
+				}
+
+				std::cout << "pulse width:";
+				std::cin >> tp.width;
+				if (!cin.good())
+				{
+					clean_cin();
+					std::cout << "Uncorrect value, set default: " << DEFAULT_PULSE_WIDTH << '\n';
+					tp.width = DEFAULT_PULSE_WIDTH;
+				}
+			}
+			catch (...)
+			{
+				std::cout << "Enter correct param\n";
+			}
+			sa::SawAnalyzingFunc::test_param_out(tp);
+			std::cout << "---Config accept---\n";
+			m_config.unlock();
+		}
+	}
 }
 
 int main()
@@ -99,16 +170,27 @@ int main()
 	const string WORK_DIR_NAME	 = "TestData";
 	const string TESTED_DIR_NAME = "Tested";
 	const string RESULT_DIR_NAME = "Result";
+
+	bool working = false;
 		
+	std::cout << "Welcome to SawAnalyser v0.1 " << '\n';
+	sa::SawAnalyzingFunc::test_param_out(tp);
 
 	prepare(TESTED_DIR_NAME, RESULT_DIR_NAME);
 
+	std::thread(param_parcer).detach();
+
 	while (1)
 	{
-		std::cout << "Working... " << '\n';
-
 		for (auto& p : fs::directory_iterator(WORK_DIR_NAME))
 		{
+			m_config.lock();
+			if (!working)
+			{
+				std::cout << "Start working... " << "\n\n";
+				working = true;
+			}
+
 			if (!fs::is_directory(p))
 			{
 				auto to = TESTED_DIR_NAME / fs::path(p).filename();
@@ -116,11 +198,16 @@ int main()
 				fs::remove(p);
 
 				std::thread(check_data, to, RESULT_DIR_NAME).detach();
+				//std::this_thread::sleep_for(1s);
 			}
-
+			m_config.unlock();
 		}
-
 		std::this_thread::sleep_for(1s);
+		if (working)
+		{
+			std::cout << "Work done\n";
+			working = false;
+		}
 	}
 
 }
