@@ -174,25 +174,31 @@ int main(int argc, char ** argv)
         string arg(argv[i]);
         try
         {
-            if (arg == "-amin")
+            if (arg == "-erronly")
+            {
+                string p(argv[i + 1]);
+                bool i = static_cast<bool>(std::stoi(p, nullptr));
+                err_only = i;
+            }
+            else if (arg == "-amin")
             {
                 string p(argv[i + 1]);
                 int i = std::stoi(p, nullptr);
                 tp.aml_min = i;
             }
-            if (arg == "-amax")
+            else if (arg == "-amax")
             {
                 string p(argv[i + 1]);
                 int i = std::stoi(p, nullptr);
                 tp.aml_max = i;
             }
-            if (arg == "-aerr")
+            else if (arg == "-aerr")
             {
                 string p(argv[i + 1]);
                 int i = std::stoi(p, nullptr);
                 tp.err = i;
             }
-            if (arg == "-w")
+            else if (arg == "-w")
             {
                 string p(argv[i + 1]);
                 int i = std::stoi(p, nullptr);
