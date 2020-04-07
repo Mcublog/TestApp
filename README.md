@@ -121,3 +121,100 @@ A_MAX = 500
 INC = 10
 NUM_PULSE = 555
 ```
+
+### Процедура сборки
+
+Для сборки программы SawAnalyser, требуется утилита cmake не ниже версии 3.0, а также версия gcc и g++ не ниже версии 8.
+
+Команды для сборки
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
+
+Результат успешной сборки:
+```bash
+viacheslav@virtualbox:~/TestApp$ mkdir build
+viacheslav@virtualbox:~/TestApp$ cd build/
+viacheslav@virtualbox:~/TestApp/build$ cmake ..
+-- The C compiler identification is GNU 8.4.0
+-- The CXX compiler identification is GNU 8.4.0
+-- Check for working C compiler: /usr/bin/cc
+-- Check for working C compiler: /usr/bin/cc -- works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Check for working CXX compiler: /usr/bin/c++
+-- Check for working CXX compiler: /usr/bin/c++ -- works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Looking for pthread.h
+-- Looking for pthread.h - found
+-- Looking for pthread_create
+-- Looking for pthread_create - not found
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - found
+-- Found Threads: TRUE  
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/viacheslav/TestApp/build
+viacheslav@virtualbox:~/TestApp/build$ make
+Scanning dependencies of target LibSawAnalyzing
+[ 25%] Building CXX object LibSawAnalyzing/CMakeFiles/LibSawAnalyzing.dir/LibSawAnalyzing.cpp.o
+[ 50%] Linking CXX static library libLibSawAnalyzing.a
+[ 50%] Built target LibSawAnalyzing
+Scanning dependencies of target App
+[ 75%] Building CXX object ConsoleApplication/CMakeFiles/App.dir/ConsoleApplication.cpp.o
+[100%] Linking CXX executable App
+[100%] Built target App
+```
+
+###Пример тестирования
+Для проверки интерактивного изменения контрольных параметров, рекомендуется запустить приложение из директории binDebug. Работа приложения здесь искусственно замедлено, это поможет спокойно изменять конфигурацию на небольшом кол-ве данных.
+
+Пример запуска.
+```bash
+./App -erronly 1 -amin 0 -amax 500 -aerr 20 -w 50
+```
+Для оценки производительности можно запусить приложение аналогичныи образом из директории binRealese.
+
+Пример диалога конфигурации:
+```
+Welcome to SawAnalyser v0.1
+ErrorsOnly,1
+TestParameters
+AMPLITUDE_MIN,0
+AMPLITUDE_MAX,480
+AMPLITUDE_ERR,20
+PULSE_WIDTH,50
+Start working... 
+
+cfg 
+----Enter config param---
+err_only:1
+amplitude_min:0
+amplitude_max:500
+amplitude error:5
+pulse width:50
+TestParameters
+AMPLITUDE_MIN,0
+AMPLITUDE_MAX,500
+AMPLITUDE_ERR,5
+PULSE_WIDTH,50
+---Config accept---
+```
+###Недостатки программы
+- Использование текстовых файлов слишком громотко, возможно, лучше было бы использовать бинарные файлы.
+- Нет проверки корректности тестовых данных
+- Не очень удобный способ отладки, приходиться вручную копировать фалы в директорию TestData. Лучше было бы использовать скрипт на питоне, чтобы он сразу генерировал в рабочей директории файлы.
+- Хардкод рабочих директорий, удобней было использовать конфигурируемые параметры.
+- Очень простые способы анализа сигнала.
+- Бедный отчет по результатам тестирования
+- Слабый анализ данных получаемых от пользователя
